@@ -2,8 +2,6 @@ import numpy as np
 import sounddevice as sd
 import speech_recognition as sr
 import os
-import io
-import wave
 from piper.voice import PiperVoice
 
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -54,19 +52,11 @@ class TTS:
 
 def find_microphone(mic_name):
     mic_list = sr.Microphone.list_microphone_names()
-    print(mic_list)
     for i, name in enumerate(mic_list):
         if mic_name in name:
             return i
 
     return None
-
-def record_audio(duration=10, samplerate=44100, channels=1, device=None):
-    audio_data = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=channels, dtype='int16', device=device)
-    sd.wait()
-
-    raw_audio_bytes = audio_data.tobytes()
-    return sr.AudioData(raw_audio_bytes, samplerate, 2)
 
 def main():
     tts_agent = TTS("british.onnx")
@@ -78,52 +68,31 @@ def main():
         tts_agent.say("Microphone Not Found... Exitting.")
         return
 
+    mic = sr.Microphone(device_index=mic_idx)
     r = sr.Recognizer()
+    r.energy_threshold = 3000
 
-    print("While AI is speaking, you will not be able to respond.")
-    while True:            
-        buffer = ""
-        collected_message = []
-        message_started = False
-        transcribed_message = ""
+    with mic as source:
+        print("While AI is speaking, you will not be able to respond.")
         while True:
-            audio = record_audio(device=mic_idx)
+            
+            r.adjust_for_ambient_noise(source, duration=1)
+            print(f"Energy: {r.energy_threshold}")
+            tts_agent.say(f"New energy: {r.energy_threshold:.2f}")
+
+            audio = r.listen(source, )
+            print("Recognized voice...")
+
             try:
                 text = r.recognize_google(audio)
             except:
                 tts_agent.say("Sorry, I couldn't understand that. Please try again.")
                 continue
 
-            print("Transcription: " + text)
-
-            buffer += " " + text
-
-            if not message_started:
-                trigger_message = "begin message"
-                start_index = buffer.lower().find(trigger_message)
-
-                if start_index != -1:
-                    print("Trigger detected. Starting capture.")
-                    message_started = True
-                    buffer = buffer[start_index + len(trigger_message):]
-            if message_started:
-                end_message = "end message"
-                end_index = buffer.lower().find(end_message)
-
-                if end_index != -1:
-                    collected_message.append(buffer[:end_index].strip())
-                    print("End detected. Capture complete.")
-                    transcribed_message = " ".join(collected_message).strip()
-                    break
-                else:
-                    collected_message.append(buffer.strip())
-                    buffer = ""
-
-
-        print("You: " + transcribed_message)
-        ai_msg = ai_agent.invoke(transcribed_message)
-        print("AI: " + ai_msg)
-        tts_agent.say(ai_msg)
+            print("You: " + text)
+            ai_msg = ai_agent.invoke(text)
+            print("AI: " + ai_msg)
+            tts_agent.say(ai_msg)
 
     tts_agent.close()
 
