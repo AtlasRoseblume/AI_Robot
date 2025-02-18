@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Wait for wifi
+sleep 10
+cd /home/atlas/Desktop/AI_Robot/bot_daemon
+source ../venv/bin/activate
+source .env
+python main.py
+deactivate

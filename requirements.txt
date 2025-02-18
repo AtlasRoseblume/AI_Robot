@@ -1,0 +1,9 @@
+piper-tts
+faster-whisper
+pyaudio
+SpeechRecognition
+numpy
+sounddevice
+langchain-core
+langgraph>0.2.27
+langchain-openai
